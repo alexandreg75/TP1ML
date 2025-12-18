@@ -127,19 +127,8 @@ Le nombre de lignes peut augmenter entre deux snapshots car de nouveaux clients 
 
 Question 5.c : 
 
-CSV (month_XXX)
-      |
-      v
-  Upsert tables live
-      |
-      v
-Validation Great Expectations
-      |
-      v
-Snapshots temporels (as_of)
-      |
-      v
-Tables *_snapshots
+CSV (month_XXX) --->  Upsert tables live ---> Validation Great Expectations ---> Snapshots temporels (as_of) --->  Tables *_snapshots
+
 
 
 - On ne travaille pas directement sur les tables live pour entrainer un modèle car elles évoluent en permanence et contiennent des informations futures par rapport à une date d’observation donnée. Entraîner un modèle directement dessus introduirait une fuite de données temporelle, faussant les performances et invalidant toute évaluation.
