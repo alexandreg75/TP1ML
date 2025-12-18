@@ -4,7 +4,7 @@ Exercice 1 :
 
 Question 1.a/b : 
 
-Image 1.png
+/home/galstian/ML_TP/rendus/images TP1/Image 1.png
 
 Question 1.c : 
 
