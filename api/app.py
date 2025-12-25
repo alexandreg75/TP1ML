@@ -5,6 +5,11 @@ import mlflow.pyfunc
 import pandas as pd
 import os
 
+# --- Prometheus metrics ---
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
+import time
+
 app = FastAPI(title="StreamFlow Churn Prediction API")
 
 # --- Config ---
@@ -14,6 +19,10 @@ MODEL_URI = f"models:/{MODEL_NAME}/Production"
 
 # Optionnel mais utile : MLflow regarde cette variable pour contacter le tracking server
 os.environ.setdefault("MLFLOW_TRACKING_URI", os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000"))
+
+# --- Prometheus metrics objects ---
+REQUEST_COUNT = Counter("api_requests_total", "Total number of API requests")
+REQUEST_LATENCY = Histogram("api_request_latency_seconds", "Latency of API requests in seconds")
 
 try:
     store = FeatureStore(repo_path=REPO_PATH)
@@ -57,7 +66,11 @@ def get_features(user_id: str):
 
 @app.post("/predict")
 def predict(payload: UserPayload):
+    start_time = time.time()
+    REQUEST_COUNT.inc()
+
     if store is None or model is None:
+        REQUEST_LATENCY.observe(time.time() - start_time)
         return {"error": "Model or feature store not initialized"}
 
     features_request = [
@@ -89,6 +102,7 @@ def predict(payload: UserPayload):
     # Si user_id inexistant ou hors fenêtre matérialisée => valeurs None => on renvoie une erreur propre
     if X.isnull().any().any():
         missing = X.columns[X.isnull().any()].tolist()
+        REQUEST_LATENCY.observe(time.time() - start_time)
         return {
             "error": f"Missing features for user_id={payload.user_id}",
             "missing_features": missing,
@@ -100,8 +114,15 @@ def predict(payload: UserPayload):
     # Prédiction via modèle MLflow pyfunc
     y_pred = model.predict(X)
 
+    REQUEST_LATENCY.observe(time.time() - start_time)
+
     return {
         "user_id": payload.user_id,
         "prediction": int(y_pred[0]),
         "features_used": X.to_dict(orient="records")[0],
     }
+
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
